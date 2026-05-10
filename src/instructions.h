@@ -1,0 +1,52 @@
+#ifndef INSTRUCTIONS_H
+#define INSTRUCTIONS_H
+
+#include "types.h"
+
+void execute(PDP11 *cpu, uint16_t instr);
+
+#endif
+
+
+/*
+Уровень 1 (простые):
+  □ NOP
+  □ COM
+  □ BIT
+  □ BIC
+  □ BIS
+  □ SWAB
+  □ JMP
+
+Уровень 2 (сдвиги):
+  □ ASL
+  □ ASR
+  □ ROL
+  □ ROR
+
+Уровень 3 (переходы):
+  □ BGE
+  □ BLT
+  □ BGT
+  □ BLE
+  □ BHI
+  □ BLOS
+  □ BVC
+  □ BVS
+  □ BCC
+  □ BCS
+
+Уровень 4 (арифметика с переносом):
+  □ ADC
+  □ SBC
+  □ SOB
+
+Уровень 5 (управление флагами):
+  □ CLC, CLV, CLZ, CLN, CCC
+  □ SEC, SEV, SEZ, SEN, SCC
+
+Уровень 6 (прерывания):
+  □ TRAP
+  □ EMT
+  □ RTI
+*/
