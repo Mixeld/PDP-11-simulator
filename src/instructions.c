@@ -634,9 +634,6 @@ static void instr_ror (PDP11 *cpu, uint16_t instr){
     }
 }
 
-/* ================ ПЕРЕХОДЫ ================ */
-
-
 
 /* ================ Переходы ================ */
 
@@ -668,6 +665,80 @@ static void instr_bmi(PDP11 *cpu, uint16_t instr)
     if (cpu_get_flag(cpu, PSW_N))
         do_branch(cpu, instr);
 }
+
+static void instr_bvc (PDP11 *cpu, uint16_t instr){
+    if (!cpu_get_flag(cpu, PSW_V))
+    do_branch(cpu,instr);
+}
+
+static void instr_bvs (PDP11 *cpu, uint16_t instr){
+    if (cpu_get_flag(cpu, PSW_V))
+    do_branch(cpu,instr);
+}
+
+static void instr_bcc (PDP11 *cpu, uint16_t instr){
+    if (!cpu_get_flag(cpu, PSW_C))
+        do_branch(cpu, instr);
+}
+
+static void instr_bcs (PDP11 *cpu, uint16_t instr){
+    if (cpu_get_flag(cpu, PSW_C))
+        do_branch(cpu, instr);
+}
+
+
+static void instr_bge (PDP11 *cpu, uint16_t instr){
+    int n = cpu_get_flag(cpu, PSW_N);
+    int v = cpu_get_flag(cpu, PSW_V);
+
+    if ((n ^ v) == 0)
+        do_branch(cpu,instr);
+}
+
+static void instr_blt (PDP11 *cpu, uint16_t instr){
+    int n = cpu_get_flag(cpu, PSW_N);
+    int v = cpu_get_flag(cpu, PSW_V);
+
+    if ((n ^ v) == 1)
+        do_branch(cpu,instr);
+}
+
+
+static void instr_bgt (PDP11 *cpu, uint16_t instr){
+    int n = cpu_get_flag(cpu, PSW_N);
+    int v = cpu_get_flag(cpu, PSW_V);
+    int z = cpu_get_flag(cpu, PSW_Z);
+
+    if ((n ^ v) == 0 && z == 0)
+        do_branch(cpu, instr);
+}
+
+static void instr_ble (PDP11 *cpu, uint16_t instr){
+    int n = cpu_get_flag(cpu, PSW_N);
+    int v = cpu_get_flag(cpu, PSW_V);
+    int z = cpu_get_flag(cpu, PSW_Z);
+
+    if ((n ^ v) == 1 || z == 1)
+        do_branch(cpu, instr);
+}
+
+static void instr_bhi (PDP11 *cpu, uint16_t instr){
+    int c = cpu_get_flag (cpu, PSW_C);
+    int z = cpu_get_flag (cpu, PSW_Z);
+
+    if (c == 0 && z == 0)
+        do_branch(cpu, instr);
+}
+
+static void instr_blos (PDP11 *cpu, uint16_t instr){
+    int c = cpu_get_flag( cpu, PSW_C);
+    int z = cpu_get_flag (cpu, PSW_Z);
+
+    if (c == 1 || z == 1)
+        do_branch(cpu, instr);
+}
+
+
 
 /* ================ JSR / RTS ================ */
 
@@ -718,8 +789,9 @@ void execute(PDP11 *cpu, uint16_t instr)
         return;
     }
 
-    if (instr == 0000000) {
-        instr_nop (cpu, instr);
+    /* NOP */
+    if (instr == 0000240) {
+        instr_nop(cpu, instr);
         return;
     }
 
@@ -728,9 +800,9 @@ void execute(PDP11 *cpu, uint16_t instr)
     switch (opcode) {
     case 001: instr_mov(cpu, instr); return;
     case 002: instr_cmp(cpu, instr); return;
-    case 003: instr_bit(cpu, instr); return;  
-    case 004: instr_bic(cpu, instr); return;   
-    case 005: instr_bis(cpu, instr); return; 
+    case 003: instr_bit(cpu, instr); return;
+    case 004: instr_bic(cpu, instr); return;
+    case 005: instr_bis(cpu, instr); return;
     case 006: instr_add(cpu, instr); return;
     case 016: instr_sub(cpu, instr); return;
     }
@@ -738,36 +810,51 @@ void execute(PDP11 *cpu, uint16_t instr)
     /* Однооперандные: биты 15-6 */
     opcode = (instr >> 6) & 0x3FF;
     switch (opcode) {
-    case 00050: instr_clr(cpu, instr); return;
-    case 00051: instr_com(cpu, instr); return;
-    case 00052: instr_inc(cpu, instr); return;
-    case 00053: instr_dec(cpu, instr); return;
-    case 00054: instr_neg(cpu, instr); return;
-    case 00055: instr_adc(cpu, instr); return;
-    case 00057: instr_tst(cpu, instr); return;
-    case 00060: instr_ror(cpu, instr); return;
-    case 00061: instr_rol(cpu, instr); return;
-    case 00062: instr_asr(cpu, instr); return;
-    case 00063: instr_asl(cpu, instr); return;
+    case 00001: instr_jmp(cpu, instr);  return;
     case 00003: instr_swab(cpu, instr); return;
-    case 00001: instr_jmp(cpu, instr); return;
+    case 00050: instr_clr(cpu, instr);  return;
+    case 00051: instr_com(cpu, instr);  return;
+    case 00052: instr_inc(cpu, instr);  return;
+    case 00053: instr_dec(cpu, instr);  return;
+    case 00054: instr_neg(cpu, instr);  return;
+    case 00055: instr_adc(cpu, instr);  return;
+    case 00057: instr_tst(cpu, instr);  return;
+    case 00060: instr_ror(cpu, instr);  return;
+    case 00061: instr_rol(cpu, instr);  return;
+    case 00062: instr_asr(cpu, instr);  return;
+    case 00063: instr_asl(cpu, instr);  return;
     }
 
-    /* Переходы: биты 15-8 */
-    opcode = (instr >> 8) & 0xFF;
-    switch (opcode) {
-    case 0004: instr_jsr(cpu, instr); return;
-    case 0001: instr_br(cpu, instr);  return;
-    case 0002: instr_bne(cpu, instr); return;
-    case 0003: instr_beq(cpu, instr); return;
-    case 0100: instr_bpl(cpu, instr); return;
-    case 0101: instr_bmi(cpu, instr); return;
+    /* JSR */
+    if ((instr & 0xFE00) == 0x0800) {
+        instr_jsr(cpu, instr);
+        return;
     }
 
     /* RTS */
     if ((instr & 0xFFF8) == 000200) {
         instr_rts(cpu, instr);
         return;
+    }
+
+    /* Переходы: биты 15-8 */
+    opcode = instr >> 8;
+    switch (opcode) {
+    case 0001: instr_br(cpu, instr);   return;
+    case 0002: instr_bne(cpu, instr);  return;
+    case 0003: instr_beq(cpu, instr);  return;
+    case 0004: instr_bge(cpu, instr);  return;
+    case 0005: instr_blt(cpu, instr);  return;
+    case 0006: instr_bgt(cpu, instr);  return;
+    case 0007: instr_ble(cpu, instr);  return;
+    case 0200: instr_bpl(cpu, instr);  return;
+    case 0201: instr_bmi(cpu, instr);  return;
+    case 0202: instr_bhi(cpu, instr);  return;
+    case 0203: instr_blos(cpu, instr); return;
+    case 0204: instr_bvc(cpu, instr);  return;
+    case 0205: instr_bvs(cpu, instr);  return;
+    case 0206: instr_bcc(cpu, instr);  return;
+    case 0207: instr_bcs(cpu, instr);  return;
     }
 
     printf("Неизвестная инструкция: %06o (PC=%06o)\n",

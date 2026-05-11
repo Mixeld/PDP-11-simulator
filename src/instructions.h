@@ -9,7 +9,7 @@ void execute(PDP11 *cpu, uint16_t instr);
 
 
 /*
-Уровень 1 (простые):
+Уровень 1 (простые): ...
   □ NOP .
   □ COM .
   □ BIT .
@@ -18,27 +18,27 @@ void execute(PDP11 *cpu, uint16_t instr);
   □ SWAB .
   □ JMP .
 
-Уровень 2 (сдвиги):
-  □ ASL
-  □ ASR
-  □ ROL
+Уровень 2 (сдвиги): ......
+  □ ASL - сдвиг влево
+  □ ASR - сдвиг врпаво
+  □ ROL - 
   □ ROR
 
-Уровень 3 (переходы):
-  □ BGE
-  □ BLT
-  □ BGT
-  □ BLE
-  □ BHI
-  □ BLOS
-  □ BVC
-  □ BVS
-  □ BCC
-  □ BCS
+Уровень 3 (переходы): ...
+  □ BGE .
+  □ BLT .
+  □ BGT .
+  □ BLE .
+  □ BHI .
+  □ BLOS .
+  □ BVC .
+  □ BVS .
+  □ BCC . 
+  □ BCS .
 
 Уровень 4 (арифметика с переносом):
   □ ADC .
-  □ SBC
+  □ SBC 
   □ SOB
 
 Уровень 5 (управление флагами):
