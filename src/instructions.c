@@ -469,6 +469,175 @@ static void instr_neg(PDP11 *cpu, uint16_t instr)
         cpu_clear_flag(cpu, PSW_C);
 }
 
+/* ================ СДВИГИ ================*/
+
+static void instr_asl(PDP11 *cpu, uint16_t instr){
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    uint16_t val;
+    uint16_t addr =0;
+
+    if (dm == 0){
+        val = cpu -> reg[dr];
+    } else {
+        addr = resolve_dst_addr(cpu, dm , dr);
+        val = mem_read_word(cpu, addr);
+    }
+
+    uint16_t result = val << 1;
+
+    if (dm == 0){
+        cpu -> reg[dr] = result;
+    } else {
+        mem_write_word(cpu, addr, result);
+    }
+
+    if (val & 0x8000){
+        cpu_set_flag(cpu,PSW_C);
+    } else {
+        cpu_clear_flag(cpu,PSW_C);
+    }
+
+    cpu_update_nz(cpu, result);
+
+    int n = cpu_get_flag(cpu, PSW_N);
+    int c = cpu_get_flag(cpu, PSW_C);
+
+    if (n ^ c) {
+        cpu_set_flag(cpu,PSW_V);
+    } else {
+        cpu_clear_flag(cpu, PSW_V);
+    }
+}
+
+static void instr_asr(PDP11 *cpu, uint16_t instr){
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    uint16_t val;
+    uint16_t addr =0;
+
+    if (dm == 0){
+        val = cpu -> reg[dr];
+    } else {
+        addr = resolve_dst_addr(cpu, dm , dr);
+        val = mem_read_word(cpu, addr);
+    }
+
+    uint16_t result = (val >> 1) | (val & 0x8000);
+
+    if (dm == 0){
+        cpu -> reg[dr] = result;
+    } else {
+        mem_write_word(cpu, addr, result);
+    }
+
+    if (val & 1){
+        cpu_set_flag(cpu,PSW_C);
+    } else {
+        cpu_clear_flag(cpu,PSW_C);
+    }
+
+    cpu_update_nz(cpu, result);
+
+    int n = cpu_get_flag(cpu, PSW_N);
+    int c = cpu_get_flag(cpu, PSW_C);
+
+    if (n ^ c) {
+        cpu_set_flag(cpu,PSW_V);
+    } else {
+        cpu_clear_flag(cpu, PSW_V);
+    }
+}
+
+static void instr_rol (PDP11 *cpu, uint16_t instr){
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    uint16_t val;
+    uint16_t addr = 0;
+
+    if (dm == 0){
+        val = cpu -> reg[dr];
+    } else {
+        addr = resolve_dst_addr (cpu, dm, dr);
+        val = mem_read_word(cpu, addr);
+    }
+
+    uint16_t old_c = cpu_get_flag(cpu, PSW_C) ? 1 : 0;
+
+    if (val & 0x8000){
+        cpu_set_flag(cpu, PSW_C);
+    } else {
+        cpu_clear_flag(cpu, PSW_C);
+    }
+
+    uint16_t result = (val << 1) | old_c;
+
+    if (dm == 0){
+        cpu -> reg[dr] = result;
+    } else {
+        mem_write_word(cpu, addr, result);
+    }
+
+    cpu_update_nz(cpu, result);
+
+    int n = cpu_get_flag(cpu, PSW_N);
+    int c = cpu_get_flag(cpu, PSW_C);
+    if (n ^ c){
+        cpu_set_flag(cpu, PSW_V);
+    } else {
+        cpu_clear_flag(cpu, PSW_V);
+    }
+}
+
+
+static void instr_ror (PDP11 *cpu, uint16_t instr){
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    uint16_t val;
+    uint16_t addr = 0;
+
+    if (dm == 0){
+        val = cpu -> reg[dr];
+    } else {
+        addr = resolve_dst_addr (cpu, dm, dr);
+        val = mem_read_word(cpu, addr);
+    }
+
+    uint16_t old_c = cpu_get_flag(cpu, PSW_C) ? 1 : 0;
+
+    if (val & 1){
+        cpu_set_flag(cpu, PSW_C);
+    } else {
+        cpu_clear_flag(cpu, PSW_C);
+    }
+
+    uint16_t result = (val >> 1) | (old_c << 15);
+
+    if (dm == 0){
+        cpu -> reg[dr] = result;
+    } else {
+        mem_write_word(cpu, addr, result);
+    }
+
+    cpu_update_nz(cpu, result);
+
+    int n = cpu_get_flag(cpu, PSW_N);
+    int c = cpu_get_flag(cpu, PSW_C);
+    if (n ^ c){
+        cpu_set_flag(cpu, PSW_V);
+    } else {
+        cpu_clear_flag(cpu, PSW_V);
+    }
+}
+
+/* ================ ПЕРЕХОДЫ ================ */
+
+
+
 /* ================ Переходы ================ */
 
 static void instr_br(PDP11 *cpu, uint16_t instr)
@@ -576,6 +745,10 @@ void execute(PDP11 *cpu, uint16_t instr)
     case 00054: instr_neg(cpu, instr); return;
     case 00055: instr_adc(cpu, instr); return;
     case 00057: instr_tst(cpu, instr); return;
+    case 00060: instr_ror(cpu, instr); return;
+    case 00061: instr_rol(cpu, instr); return;
+    case 00062: instr_asr(cpu, instr); return;
+    case 00063: instr_asl(cpu, instr); return;
     case 00003: instr_swab(cpu, instr); return;
     case 00001: instr_jmp(cpu, instr); return;
     }
