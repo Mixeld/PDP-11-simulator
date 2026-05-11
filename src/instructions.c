@@ -301,6 +301,57 @@ static void instr_adc (PDP11 *cpu, uint16_t instr){
     }
 }
 
+static void instr_sbc (PDP11 *cpu, uint16_t instr){
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    uint16_t val;
+    uint16_t addr = 0;
+
+    if (dm == 0) {
+        val = cpu -> reg[dr];
+    } else {
+        addr = resolve_dst_addr(cpu, dm, dr);
+        val = mem_read_word(cpu, addr);
+    }
+
+    uint16_t c = cpu_get_flag(cpu, PSW_C) ? 1 : 0;
+
+    uint32_t result32 = (uint32_t)val - c;
+    uint16_t result = (uint16_t)result32;
+
+    if (dm == 0){
+        cpu -> reg[dr] = result;
+    } else {
+        mem_write_word(cpu, addr, result);
+    }
+
+    cpu_update_nz(cpu, result);
+
+    if (val == 0100000 && c ==1){
+        cpu_set_flag(cpu, PSW_V);
+    } else {
+        cpu_clear_flag(cpu, PSW_V);
+    }
+
+    if(val == 0 && c == 1){
+        cpu_set_flag(cpu, PSW_C);
+    } else {
+        cpu_clear_flag(cpu, PSW_C);
+    }
+}
+
+static void instr_sob (PDP11 *cpu, uint16_t instr){
+    int reg = (instr >> 6) & 7;
+    int offset = instr & 077;
+
+    cpu -> reg[reg]--;
+
+    if(cpu -> reg[reg] != 0){
+        cpu -> reg[PC] -= offset * 2;
+    }    
+}
+
 static void instr_swab(PDP11 *cpu, uint16_t instr){
     int dm = INSTR_DST_MODE(instr);
     int dr = INSTR_DST_REG(instr);
@@ -795,6 +846,11 @@ void execute(PDP11 *cpu, uint16_t instr)
         return;
     }
 
+    if (((instr >> 9) & 0177) == 0077){
+        instr_sob(cpu, instr);
+        return;
+    }
+    
     /* Двухоперандные: биты 15-12 */
     opcode = (instr >> 12) & 0xF;
     switch (opcode) {
@@ -818,6 +874,7 @@ void execute(PDP11 *cpu, uint16_t instr)
     case 00053: instr_dec(cpu, instr);  return;
     case 00054: instr_neg(cpu, instr);  return;
     case 00055: instr_adc(cpu, instr);  return;
+    case 00056: instr_sbc(cpu, instr); return;
     case 00057: instr_tst(cpu, instr);  return;
     case 00060: instr_ror(cpu, instr);  return;
     case 00061: instr_rol(cpu, instr);  return;
