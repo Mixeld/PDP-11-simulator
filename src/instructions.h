@@ -10,13 +10,13 @@ void execute(PDP11 *cpu, uint16_t instr);
 
 /*
 Уровень 1 (простые):
-  □ NOP
-  □ COM
-  □ BIT
-  □ BIC
-  □ BIS
-  □ SWAB
-  □ JMP
+  □ NOP .
+  □ COM .
+  □ BIT .
+  □ BIC .
+  □ BIS .
+  □ SWAB .
+  □ JMP .
 
 Уровень 2 (сдвиги):
   □ ASL
@@ -37,7 +37,7 @@ void execute(PDP11 *cpu, uint16_t instr);
   □ BCS
 
 Уровень 4 (арифметика с переносом):
-  □ ADC
+  □ ADC .
   □ SBC
   □ SOB
 
@@ -49,4 +49,12 @@ void execute(PDP11 *cpu, uint16_t instr);
   □ TRAP
   □ EMT
   □ RTI
+
+
+
+
+N — по результату         ✓ (делает cpu_update_nz)
+Z — по результату         ✓ (делает cpu_update_nz)
+V — всегда 0              ✗ ← ты забыл это
+C — НЕ МЕНЯТЬ             ✗ ← ты сбрасываешь, а не надо
 */
