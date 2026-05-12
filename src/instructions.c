@@ -407,12 +407,6 @@ static void instr_jmp (PDP11 *cpu, uint16_t instr) {
     cpu -> reg[PC] = addr;
 }
 
-static void instr_nop (PDP11 *cpu, uint16_t instr){
-    (void)cpu;
-    (void)instr;
-}
-
-
 static void instr_inc(PDP11 *cpu, uint16_t instr)
 {
     int dm = INSTR_DST_MODE(instr);
@@ -789,7 +783,23 @@ static void instr_blos (PDP11 *cpu, uint16_t instr){
         do_branch(cpu, instr);
 }
 
+/* ================ управление флагами ================ */
 
+static void instr_flags (PDP11 *cpu, uint16_t instr){
+    int set = (instr >> 4) & 1;
+
+    if (set) {
+        if (instr & 0x01) cpu_set_flag (cpu, PSW_C);
+        if (instr & 0x02) cpu_set_flag (cpu, PSW_V);
+        if (instr & 0x04) cpu_set_flag (cpu, PSW_Z);
+        if (instr & 0x08) cpu_set_flag (cpu, PSW_N);
+    } else {
+        if (instr & 0x01) cpu_get_flag (cpu, PSW_C);
+        if (instr & 0x02) cpu_get_flag (cpu, PSW_V);
+        if (instr & 0x04) cpu_get_flag (cpu, PSW_Z);
+        if (instr & 0x08) cpu_get_flag (cpu, PSW_N);
+    }
+}
 
 /* ================ JSR / RTS ================ */
 
@@ -841,8 +851,8 @@ void execute(PDP11 *cpu, uint16_t instr)
     }
 
     /* NOP */
-    if (instr == 0000240) {
-        instr_nop(cpu, instr);
+    if (instr >= 0000240 && instr <= 0000277) {
+        instr_flags(cpu, instr);
         return;
     }
 
@@ -850,7 +860,7 @@ void execute(PDP11 *cpu, uint16_t instr)
         instr_sob(cpu, instr);
         return;
     }
-    
+
     /* Двухоперандные: биты 15-12 */
     opcode = (instr >> 12) & 0xF;
     switch (opcode) {
