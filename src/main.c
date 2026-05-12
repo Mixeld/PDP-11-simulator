@@ -692,72 +692,114 @@ static void test_sum_loop(PDP11 *cpu)
 /* ============================================================
  *  Запуск всех тестов
  * ============================================================ */
+#include <stdio.h>
+#include "types.h"
+#include "cpu.h"
+#include "loader.h"
+#include "debug.h"
+#include "memory.h"
 
 int main(void)
 {
     PDP11 cpu;
     cpu_init(&cpu);
 
-    printf("========================================\n");
-    printf("   Тесты симулятора PDP-11\n");
-    printf("========================================\n");
+    uint16_t program[] = {
+        /* 00 */ 0012705,    /* MOV #array, R5 */
+        /* 01 */ 0001054,    /* адрес array */
 
-    /* Двухоперандные */
-    test_mov(&cpu);
-    test_add(&cpu);
-    test_sub(&cpu);
-    test_cmp(&cpu);
-    test_bit(&cpu);
-    test_bic(&cpu);
-    test_bis(&cpu);
+        /* outer: */
+        /* 02 */ 0005004,    /* CLR R4 */
+        /* 03 */ 0012703,    /* MOV #7, R3 */
+        /* 04 */ 0000007,
+        /* 05 */ 0010500,    /* MOV R5, R0 */
 
-    /* Однооперандные */
-    test_clr(&cpu);
-    test_inc(&cpu);
-    test_dec(&cpu);
-    test_neg(&cpu);
-    test_tst(&cpu);
-    test_com(&cpu);
-    test_adc(&cpu);
-    test_swab(&cpu);
+        /* inner: */
+        /* 06 */ 0011001,    /* MOV (R0), R1 */
+        /* 07 */ 0016002,    /* MOV 2(R0), R2 */
+        /* 08 */ 0000002,
+        /* 09 */ 0020102,    /* CMP R1, R2 */
+        /* 10 */ 0003405,    /* BLE +5 (noswap) */
 
-    /* Сдвиги */
-    test_asl(&cpu);
-    test_asl_carry(&cpu);
-    test_asr(&cpu);
-    test_asr_sign(&cpu);
-    test_rol(&cpu);
-    test_ror(&cpu);
+        /* swap: */
+        /* 11 */ 0010210,    /* MOV R2, (R0) */
+        /* 12 */ 0010160,    /* MOV R1, 2(R0) */
+        /* 13 */ 0000002,
+        /* 14 */ 0012704,    /* MOV #1, R4 */
+        /* 15 */ 0000001,
 
-    /* Переходы */
-    test_br(&cpu);
-    test_bne(&cpu);
-    test_beq(&cpu);
-    test_bpl_bmi(&cpu);
-    test_bge_blt(&cpu);
-    test_bgt_ble(&cpu);
-    test_bhi_blos(&cpu);
-    test_bvc_bvs(&cpu);
-    test_bcc_bcs(&cpu);
+        /* noswap: */
+        /* 16 */ 0062700,    /* ADD #2, R0 */
+        /* 17 */ 0000002,
+        /* 18 */ 0077315,    /* SOB R3, 13 (inner) */
 
-    /* JSR/RTS */
-    test_jsr_rts(&cpu);
+        /* 19 */ 0005704,    /* TST R4 */
+        /* 20 */ 0001355,    /* BNE outer */
+        /* 21 */ 0000000,    /* HALT */
 
-    /* JMP и NOP */
-    test_jmp(&cpu);
-    test_nop(&cpu);
+        /* array: */
+        /* 22 */ 0000007,    /* 7 */
+        /* 23 */ 0000003,    /* 3 */
+        /* 24 */ 0000011,    /* 9 */
+        /* 25 */ 0000001,    /* 1 */
+        /* 26 */ 0000005,    /* 5 */
+        /* 27 */ 0000010,    /* 8 */
+        /* 28 */ 0000002,    /* 2 */
+        /* 29 */ 0000004,    /* 4 */
+    };
 
-    /* Интеграционный */
-    test_sum_loop(&cpu);
+    int prog_size = sizeof(program) / sizeof(program[0]);
+    uint16_t start = 01000;
 
-    /* Итог */
+    loader_load_words(&cpu, start, program, prog_size);
+    loader_set_start(&cpu, start);
+
+    /* Массив до сортировки */
+    printf("=== Bubble Sort на PDP-11 ===\n\n");
+    printf("Массив до сортировки:\n");
+    uint16_t array_addr = 01054;
+    for (int i = 0; i < 8; i++) {
+        printf("  [%d] = %d\n", i, mem_read_word(&cpu, array_addr + i * 2));
+    }
+
+    /* Выполнение с трассировкой */
+    printf("\nВыполнение...\n\n");
+    cpu.running = 1;
+    while (cpu.running) {
+        debug_trace(&cpu, cpu.reg[PC]);
+        cpu_step(&cpu);
+        if (cpu.cycles > 100000) {
+            printf("Превышен лимит циклов!\n");
+            cpu.running = 0;
+        }
+    }
+
+    /* Массив после сортировки */
+    printf("\nМассив после сортировки:\n");
+    int sorted = 1;
+    int expected[] = {1, 2, 3, 4, 5, 7, 8, 9};
+    for (int i = 0; i < 8; i++) {
+        uint16_t val = mem_read_word(&cpu, array_addr + i * 2);
+        printf("  [%d] = %d", i, val);
+        if (val == expected[i]) {
+            printf("  ✓\n");
+        } else {
+            printf("  ✗ (ожидалось %d)\n", expected[i]);
+            sorted = 0;
+        }
+    }
+
+    printf("\nИнструкций выполнено: %llu\n",
+           (unsigned long long)cpu.cycles);
+    debug_dump_regs(&cpu);
+
     printf("\n========================================\n");
-    printf("   Результат: %d/%d тестов пройдено\n", tests - errors, tests);
-    if (errors == 0)
-        printf("   ВСЕ ТЕСТЫ ПРОЙДЕНЫ!\n");
-    else
-        printf("   ОШИБОК: %d\n", errors);
+    if (sorted) {
+        printf("   СОРТИРОВКА УСПЕШНА!\n");
+    } else {
+        printf("   ОШИБКА СОРТИРОВКИ!\n");
+    }
     printf("========================================\n");
 
-    return errors;
+    return sorted ? 0 : 1;
 }

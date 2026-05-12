@@ -20,7 +20,7 @@ void execute(PDP11 *cpu, uint16_t instr);
 
 Уровень 2 (сдвиги): ......
   □ ASL - сдвиг влево
-  □ ASR - сдвиг врпаво
+  □ ASR - сдвиг врпаво  0123456
   □ ROL - 
   □ ROR
 
@@ -38,17 +38,17 @@ void execute(PDP11 *cpu, uint16_t instr);
 
 Уровень 4 (арифметика с переносом):
   □ ADC .
-  □ SBC 
-  □ SOB
+  □ SBC .
+  □ SOB .
 
-Уровень 5 (управление флагами):
+Уровень 5 (управление флагами): ...
   □ CLC, CLV, CLZ, CLN, CCC
   □ SEC, SEV, SEZ, SEN, SCC
 
 Уровень 6 (прерывания):
-  □ TRAP
-  □ EMT
-  □ RTI
+  □ TRAP .
+  □ EMT .
+  □ RTI 
 
 
 

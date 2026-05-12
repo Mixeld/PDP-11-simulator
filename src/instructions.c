@@ -794,11 +794,50 @@ static void instr_flags (PDP11 *cpu, uint16_t instr){
         if (instr & 0x04) cpu_set_flag (cpu, PSW_Z);
         if (instr & 0x08) cpu_set_flag (cpu, PSW_N);
     } else {
-        if (instr & 0x01) cpu_get_flag (cpu, PSW_C);
-        if (instr & 0x02) cpu_get_flag (cpu, PSW_V);
-        if (instr & 0x04) cpu_get_flag (cpu, PSW_Z);
-        if (instr & 0x08) cpu_get_flag (cpu, PSW_N);
+        if (instr & 0x01) cpu_clear_flag (cpu, PSW_C);
+        if (instr & 0x02) cpu_clear_flag (cpu, PSW_V);
+        if (instr & 0x04) cpu_clear_flag (cpu, PSW_Z);
+        if (instr & 0x08) cpu_clear_flag (cpu, PSW_N);
     }
+}
+
+/* ================ прерывания ================ */
+
+static void instr_trap (PDP11 *cpu, uint16_t instr){
+   (void) instr;
+   
+    cpu -> reg[SP] -= 2;
+    mem_write_word(cpu, cpu -> reg[SP], cpu -> psw);
+
+    cpu -> reg[SP] -= 2;
+    mem_write_word(cpu, cpu -> reg[SP], cpu -> reg[PC]);
+
+    cpu -> reg[PC] = mem_read_word(cpu, 034);
+    cpu -> psw = mem_read_word(cpu, 036);
+}
+
+static void instr_emt (PDP11 *cpu, uint16_t instr){
+    (void)instr;
+    
+    cpu -> reg[SP] -= 2;
+    mem_write_word (cpu, cpu -> reg[SP], cpu -> psw);
+
+    cpu -> reg[SP] -= 2;
+    mem_write_word (cpu, cpu -> reg [SP], cpu -> reg[PC]);
+
+    cpu -> reg[PC] = mem_read_word(cpu, 030);
+    cpu -> psw = mem_read_word (cpu, 032);
+}
+
+static void instr_rti(PDP11 *cpu, uint16_t instr)
+{
+    (void)instr;
+
+    cpu->reg[PC] = mem_read_word(cpu, cpu->reg[SP]);
+    cpu->reg[SP] += 2;
+
+    cpu->psw = mem_read_word(cpu, cpu->reg[SP]);
+    cpu->reg[SP] += 2;
 }
 
 /* ================ JSR / RTS ================ */
@@ -844,13 +883,16 @@ void execute(PDP11 *cpu, uint16_t instr)
 {
     uint16_t opcode;
 
-    /* HALT */
+    /* HALT */ 
     if (instr == 0000000) {
         instr_halt(cpu, instr);
         return;
     }
 
-    /* NOP */
+    if (instr == 0000002){
+        instr_rti (cpu, instr);
+    }
+ 
     if (instr >= 0000240 && instr <= 0000277) {
         instr_flags(cpu, instr);
         return;
@@ -922,7 +964,10 @@ void execute(PDP11 *cpu, uint16_t instr)
     case 0205: instr_bvs(cpu, instr);  return;
     case 0206: instr_bcc(cpu, instr);  return;
     case 0207: instr_bcs(cpu, instr);  return;
-    }
+    case 0210: instr_emt(cpu, instr); return;
+    case 0211: instr_trap(cpu, instr); return;
+}
+
 
     printf("Неизвестная инструкция: %06o (PC=%06o)\n",
            instr, (uint16_t)(cpu->reg[PC] - 2));
