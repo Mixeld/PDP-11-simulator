@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "debug.h"
 #include "memory.h"
+#include "disasm.h"
 
 void debug_dump_regs(PDP11 *cpu)
 {
@@ -37,8 +38,10 @@ void debug_dump_mem(PDP11 *cpu, uint16_t start, int count)
 
 void debug_trace(PDP11 *cpu, uint16_t pc)
 {
-    uint16_t instr = mem_read_word(cpu, pc);
-    printf("[%06o] %06o  R0=%06o R1=%06o R2=%06o SP=%06o\n",
-           pc, instr,
-           cpu->reg[0], cpu->reg[1], cpu->reg[2], cpu->reg[SP]);
+    char buf[64];
+    disassemble(cpu, pc, buf, sizeof(buf));
+    printf("[%06o] %-25s R0=%06o R1=%06o R2=%06o R3=%06o R4=%06o SP=%06o\n",
+           pc, buf,
+           cpu->reg[0], cpu->reg[1], cpu->reg[2],
+           cpu->reg[3], cpu->reg[4], cpu->reg[SP]);
 }

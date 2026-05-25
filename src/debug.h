@@ -1,5 +1,5 @@
-#ifndef DEBUG_H
-#define DEBUG_H
+#ifndef PDP11_DEBUG_H
+#define PDP11_DEBUG_H
 
 #include "types.h"
 

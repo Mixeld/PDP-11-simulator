@@ -782,9 +782,9 @@ int main(void)
         uint16_t val = mem_read_word(&cpu, array_addr + i * 2);
         printf("  [%d] = %d", i, val);
         if (val == expected[i]) {
-            printf("  ✓\n");
+            printf("  \n");
         } else {
-            printf("  ✗ (ожидалось %d)\n", expected[i]);
+            printf("  (ожидалось %d)\n", expected[i]);
             sorted = 0;
         }
     }
