@@ -1,4 +1,4 @@
-#include <stdio.h>
+ #include <stdio.h>
 #include "loader.h"
 #include "memory.h"
 
@@ -22,8 +22,8 @@ void loader_set_start(PDP11 *cpu, uint16_t start_addr)
     cpu->reg[SP] = 0xFFFE;
 }
 
-static uint16_t *read_file_to_buf(const char *filename, long *out_size){
-    FILE *f = fopen (filename, 'rb');
+static uint8_t *read_file_to_buf(const char *filename, long *out_size){
+    FILE *f = fopen (filename, "rb");
     if (!f){
         printf("Ошибка открытия файла %s", filename);
         return NULL;
@@ -54,7 +54,7 @@ static uint16_t *read_file_to_buf(const char *filename, long *out_size){
     }
 
     size_t read = fread(buf, 1, (size_t)size, f);
-    fcloase (f);
+    fclose (f);
 
     if ((long)read != size){
         printf("Прочитано %zu из %ld байт", read, size);
@@ -85,7 +85,7 @@ static uint8_t tape_cheksum( uint16_t block_len, uint16_t addr, const uint8_t *d
 
 int loader_load_raw (PDP11 *cpu, const char *filename, uint16_t load_addr){
     long size;
-    uint8_t *buf = read_file_to_buff (filename, &size);
+    uint8_t *buf = read_file_to_buf (filename, &size);
     if (!buf) return -1;
 
     if ((long)load_addr + size > MEM_SIZE){
@@ -104,14 +104,14 @@ int loader_load_raw (PDP11 *cpu, const char *filename, uint16_t load_addr){
 }
 
 static int save_raw(PDP11 *cpu, const char *filename, uint16_t load_addr, uint16_t lenght){
-    FILE *f = fopen (filename, 'wb');
+    FILE *f = fopen (filename, "wb");
     if (!f) {
         printf ("Не удалось создать файл\n");
         return -1;
     }
 
     fwrite(&cpu->memory[load_addr],1, lenght, f);
-    close (f);  
+    fclose (f);  
     printf("Raw сохранён");
     return 0;
 }
@@ -158,7 +158,7 @@ int loader_load_header(PDP11 *cpu, const char *filename) {
 
 
 static int save_header(PDP11 *cpu, const char *filename, uint16_t load_addr, uint16_t start_addr, uint16_t length ){
-    FILE *f = fopen (filename, 'wb');
+    FILE *f = fopen (filename, "wb");
 
     if (!f) {
         printf ("Не удалось создать файл\n");
@@ -260,7 +260,7 @@ static int save_tape(PDP11 *cpu, const char *filename, uint16_t load_addr, uint1
     const uint8_t *data = &cpu->memory[load_addr];
 
     uint16_t block_len = length + 6;
-    uint8_t  csum = tape_checksum(block_len, load_addr, data, length);
+    uint8_t  csum = tape_cheksum(block_len, load_addr, data, length);
 
     uint8_t marker[2] = {0x01, 0x00};
     fwrite(marker,      1, 2, f);
@@ -270,7 +270,7 @@ static int save_tape(PDP11 *cpu, const char *filename, uint16_t load_addr, uint1
     fwrite(data,        1, length, f);
 
     uint16_t start_block_len = 6;
-    uint8_t  start_csum = tape_checksum(start_block_len, start_addr, NULL, 0);
+    uint8_t  start_csum = tape_cheksum(start_block_len, start_addr, NULL, 0);
 
     fwrite(marker,           1, 2, f);
     fwrite(&start_block_len, 2, 1, f);
