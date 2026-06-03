@@ -1,30 +1,48 @@
-CC       = gcc
-CFLAGS   = -Wall -Wextra -std=c11 -g
+# Корневой Makefile
+.PHONY: all clean sim asm test help
 
-SRC_DIR  = src
-BUILD_DIR = build
-TARGET   = $(BUILD_DIR)/pdp11
+all: sim asm
+	@echo "Готово. Запусти: cd test && ./run_test.sh"
 
-SRCS = $(wildcard $(SRC_DIR)/*.c)
-OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRCS))
+sim:
+	@echo "Сборка симулятора..."
+	@cd simulator && $(MAKE)
+	@echo "Симулятор собран"
 
-all: $(BUILD_DIR) $(TARGET)
+asm:
+	@echo "Сборка ассемблера..."
+	@cd assembler && $(MAKE)
+	@echo "Ассемблер собран"
 
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+test: sim asm
+	@cd test && chmod +x run_test.sh && ./run_test.sh
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -I$(SRC_DIR) -c $< -o $@
+test-%: sim asm
+	@cd assembler && ./asm ../test/asm_programs/$*.asm -o /tmp/test_$*
+	@cd simulator && ./pdp11 /tmp/test_$*.lda
+	@rm -f /tmp/test_$*.lda /tmp/test_$*.lst
 
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+run-%: sim asm
+	@cd assembler && ./asm ../test/asm_programs/$*.asm -o /tmp/$*
+	@cd simulator && ./pdp11 /tmp/$*.lda
 
 clean:
-	rm -rf $(BUILD_DIR)
+	@cd simulator && $(MAKE) clean 2>/dev/null || true
+	@cd assembler && $(MAKE) clean 2>/dev/null || true
+	@rm -rf tmp/ test/tmp/ test/*.lda test/*.lst
 
-run: $(TARGET)
-	./$(TARGET)
+status:
+	@echo "Статус сборки:"
+	@if [ -f simulator/pdp11 ]; then echo "  Симулятор: собран"; else echo "  Симулятор: не собран"; fi
+	@if [ -f assembler/asm ]; then echo "  Ассемблер: собран"; else echo "  Ассемблер: не собран"; fi
 
-rebuild: clean all
-
-.PHONY: all clean run rebuild
+help:
+	@echo "Доступные команды:"
+	@echo "  make          - собрать все"
+	@echo "  make sim      - собрать симулятор"
+	@echo "  make asm      - собрать ассемблер"
+	@echo "  make test     - запустить тесты"
+	@echo "  make test-XXX - запустить тест XXX"
+	@echo "  make run-XXX  - запустить программу XXX"
+	@echo "  make status   - показать статус"
+	@echo "  make clean    - очистить"
