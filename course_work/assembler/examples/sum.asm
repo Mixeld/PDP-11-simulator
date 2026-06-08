@@ -1,0 +1,11 @@
+    .ORG 01000
+START:
+    MOV #10, R3
+    CLR R4
+LOOP:
+    ADD R3, R4
+    DEC R3
+    BNE LOOP
+    MOV R4, R0
+    HALT
+    .END START
