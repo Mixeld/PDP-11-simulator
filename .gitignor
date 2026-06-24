@@ -1,0 +1,13 @@
+
+# Build artifacts
+build/
+obj/
+*.o
+*.obj
+
+# Executables
+simulator/pdp11
+assembler/asm
+pdp11
+asm
+

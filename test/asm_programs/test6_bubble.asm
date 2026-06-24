@@ -23,8 +23,6 @@ NOSWAP:
     SOB R3, INNER
     TST R4
     BNE OUTER
-    
-    ; ВОТ ЭТИ СТРОКИ ДОБАВИТЬ:
     MOV #1, R0         ; результат в R0 (успешная сортировка)
     HALT
 
