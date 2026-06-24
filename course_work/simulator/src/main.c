@@ -4,25 +4,33 @@
 #include "cpu.h"
 #include "loader.h"
 #include "debug.h"
+#include "devices/terminal.h"
 
 int main(int argc, char *argv[]) {
     PDP11 cpu;
     cpu_init(&cpu);
     
+    terminal_init();
+    atexit(terminal_cleanup);
+
     const char *tape_file = NULL;
     int trace_mode = 0;
+    int interactive_mode = 0;    
     
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--trace") == 0) {
             trace_mode = 1;
+        } else if (strcmp(argv[i], "-i") == 0) {        /* НОВОЕ */
+            interactive_mode = 1;                        /* НОВОЕ */
         } else if (argv[i][0] != '-') {
             tape_file = argv[i];
         }
     }
     
     if (!tape_file) {
-        printf("Использование: %s [-t] <file.lda>\n", argv[0]);
+        printf("Использование: %s [-t] [-i] <file.lda>\n", argv[0]);
         printf("  -t, --trace  включить трассировку выполнения\n");
+        printf("  -i           интерактивный режим (без лимита циклов)\n");
         return 1;
     }
     
@@ -32,15 +40,20 @@ int main(int argc, char *argv[]) {
     }
     
     cpu.running = 1;
-    int steps = 0;
-    const int MAX_STEPS = 100000;
+    long long steps = 0;
+    const long long MAX_STEPS = 10000000LL;  
     
-    while (cpu.running && steps < MAX_STEPS) {
+    while (cpu.running) {
         if (trace_mode) {
             debug_trace(&cpu, cpu.reg[PC]);
         }
         cpu_step(&cpu);
         steps++;
+        
+        if (!interactive_mode && steps >= MAX_STEPS) {
+            printf("\n[Превышен лимит %lld инструкций]\n", MAX_STEPS);
+            cpu.running = 0;
+        }
     }
     
     debug_dump_regs(&cpu);

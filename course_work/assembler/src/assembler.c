@@ -29,6 +29,7 @@ static uint8_t  memory[MEMORY_SIZE];
 static uint8_t  memory_used[MEMORY_SIZE];
 static uint16_t LC        = 0;
 static uint32_t max_lc    = 0;
+static uint16_t initial_lc = 01000;
 static int quiet = 0;     
 static int verbose = 0;  
 
@@ -859,44 +860,6 @@ static int is_ignored_directive(const char *m) {
     return 0;
 }
 
-static void dump_registers_info(const char *label, uint16_t lc, const ParsedLine *pl) {
-    if (!verbose && !quiet) return;
-    
-    printf("  [%s] LC=%06o", label, lc);
-    
-    // Информация о метке
-    if (pl->label[0]) {
-        printf(" LABEL=%s", pl->label);
-    }
-    
-    // Информация об инструкции
-    if (pl->mnemonic[0]) {
-        printf(" INSTR=%s", pl->mnemonic);
-        
-        // Попытка определить используемые регистры
-        const char *regs[] = {"R0", "R1", "R2", "R3", "R4", "R5", "SP", "PC"};
-        for (int i = 0; i < 8; i++) {
-            if (strstr(pl->operands_raw, regs[i])) {
-                printf(" %s", regs[i]);
-            }
-        }
-    }
-    
-    printf("\n");
-}
-
-// Добавить функцию для анализа операндов и определения регистров
-static void analyze_operand_registers(const char *operand) {
-    if (!verbose) return;
-    
-    const char *regs[] = {"R0", "R1", "R2", "R3", "R4", "R5", "SP", "PC"};
-    for (int i = 0; i < 8; i++) {
-        if (strstr(operand, regs[i])) {
-            printf("    использует %s", regs[i]);
-        }
-    }
-}
-
 /* ══════════════════════════════════════════════════════════════════════════
  *  ПЕРВЫЙ ПРОХОД: сбор меток и расчёт размеров
  * ══════════════════════════════════════════════════════════════════════════ */
@@ -929,8 +892,8 @@ static void pass1(const char *filename) {
 
     memset(memory,      0, sizeof(memory));
     memset(memory_used, 0, sizeof(memory_used));
-    LC           = 0;
-    max_lc       = 0;
+    LC           = initial_lc;
+    max_lc       = initial_lc;
     current_line = 0;
     pass_number  = 1;
 
@@ -1288,8 +1251,8 @@ static void pass2(const char *in_filename, const char *lst_filename) {
         return;
     }
 
-    LC           = 0;
-    max_lc       = 0;
+    LC           = initial_lc;
+    max_lc       = initial_lc;
     current_line = 0;
     pass_number  = 2;
 
@@ -1631,39 +1594,6 @@ static void pass2(const char *in_filename, const char *lst_filename) {
  * tape_checksum — вычисляет контрольную сумму блока SIMH tape: однобайтовое
  * дополнение до двух от суммы всех байт заголовка (block_len, addr) и данных.
  */
-static uint8_t tape_checksum(uint16_t block_len, uint16_t addr,
-                             const uint8_t *data, int data_len) {
-    uint8_t sum = 0;
-    sum += (uint8_t)(block_len & 0xFF);
-    sum += (uint8_t)(block_len >> 8);
-    sum += (uint8_t)(addr & 0xFF);
-    sum += (uint8_t)(addr >> 8);
-    for (int i = 0; i < data_len; i++) sum += data[i];
-    return (uint8_t)((~sum + 1) & 0xFF);
-}
-
-/*
- * write_tape_block — записывает один блок в формате SIMH tape: нулевой
- * разделитель, маркер 0x01 0x00, длину блока, адрес загрузки, контрольную
- * сумму и данные. Нулевой разделитель позволяет симулятору найти маркер
- * при пропуске 0x00-байт.
- */
-static void write_tape_block(FILE *f, uint16_t addr,
-                             const uint8_t *data, int data_len) {
-    uint16_t block_len = (uint16_t)(data_len + 6);
-    uint8_t  csum      = tape_checksum(block_len, addr, data, data_len);
-
-    uint8_t pad = 0x00;
-    fwrite(&pad, 1, 1, f);
-
-    uint8_t marker[2] = { 0x01, 0x00 };
-    fwrite(marker,     1, 2, f);
-    fwrite(&block_len, 2, 1, f);
-    fwrite(&addr,      2, 1, f);
-    fwrite(&csum,      1, 1, f);
-    if (data_len > 0)
-        fwrite(data, 1, (size_t)data_len, f);
-}
 
 #define MAX_BLOCK_DATA 250
 
@@ -1797,8 +1727,10 @@ int main(int argc, char *argv[]) {
                 if (i + 1 < argc) safe_strcpy(out_base, argv[++i], sizeof(out_base));
                 break;
             case 's':
-                if (i + 1 < argc)
+                if (i + 1 < argc) {
                     start_addr = (uint16_t)strtoul(argv[++i], NULL, 8);
+                    initial_lc = start_addr;
+                }
                 break;
             case 'v':
                 verbose = 1;

@@ -972,4 +972,4 @@ void execute(PDP11 *cpu, uint16_t instr)
     printf("Неизвестная инструкция: %06o (PC=%06o)\n",
            instr, (uint16_t)(cpu->reg[PC] - 2));
     cpu->running = 0;
-}
+}   

@@ -1,38 +1,37 @@
+CC        = gcc
+CFLAGS    = -Wall -Wextra -std=c11 -g
 
-CC = gcc
-CFLAGS = -Wall -Wextra -O2 -I.
+SRC_DIR    = src
+DEV_DIR    = src/devices
+BUILD_DIR  = build
+TARGET     = $(BUILD_DIR)/pdp11
 
-TARGET = pdp11
-SRCS = src/main.c src/cpu.c src/memory.c src/instructions.c \
-       src/decode.c src/loader.c src/debug.c src/disasm.c
-OBJS = $(SRCS:src/%.c=obj/%.o)
+SRCS  = $(wildcard $(SRC_DIR)/*.c)
+SRCS += $(wildcard $(DEV_DIR)/*.c)
+
+OBJS  = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(wildcard $(SRC_DIR)/*.c))
+OBJS += $(patsubst $(DEV_DIR)/%.c, $(BUILD_DIR)/%.o, $(wildcard $(DEV_DIR)/*.c))
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
-obj/%.o: src/%.c | obj
-	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -I$(SRC_DIR) -c $< -o $@
 
-obj:
-	mkdir -p obj
+$(BUILD_DIR)/%.o: $(DEV_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -I$(SRC_DIR) -c $< -o $@
 
-test: $(TARGET)
-	$(CC) $(CFLAGS) -o test_instructions test/test_instructions.c src/*.c
-	./test_instructions
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -rf obj/ $(TARGET) test_instructions
+	rm -rf $(BUILD_DIR)
 
-test_memory: test/test_memory.c $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+run: $(TARGET)
+	./$(TARGET)
 
-test_instructions: test/test_instructions.c $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+rebuild: clean all
 
-run_tests: test_memory test_instructions
-	./test_memory
-	./test_instructions
-
-.PHONY: test_memory test_instructions run_tests
+.PHONY: all clean run rebuild
