@@ -29,6 +29,7 @@ static uint8_t  memory[MEMORY_SIZE];
 static uint8_t  memory_used[MEMORY_SIZE];
 static uint16_t LC        = 0;
 static uint32_t max_lc    = 0;
+static uint16_t initial_lc = 01000;
 static int quiet = 0;     
 static int verbose = 0;  
 
@@ -891,8 +892,8 @@ static void pass1(const char *filename) {
 
     memset(memory,      0, sizeof(memory));
     memset(memory_used, 0, sizeof(memory_used));
-    LC           = 0;
-    max_lc       = 0;
+    LC           = initial_lc;
+    max_lc       = initial_lc;
     current_line = 0;
     pass_number  = 1;
 
@@ -1250,8 +1251,8 @@ static void pass2(const char *in_filename, const char *lst_filename) {
         return;
     }
 
-    LC           = 0;
-    max_lc       = 0;
+    LC           = initial_lc;
+    max_lc       = initial_lc;
     current_line = 0;
     pass_number  = 2;
 
@@ -1726,8 +1727,10 @@ int main(int argc, char *argv[]) {
                 if (i + 1 < argc) safe_strcpy(out_base, argv[++i], sizeof(out_base));
                 break;
             case 's':
-                if (i + 1 < argc)
+                if (i + 1 < argc) {
                     start_addr = (uint16_t)strtoul(argv[++i], NULL, 8);
+                    initial_lc = start_addr;
+                }
                 break;
             case 'v':
                 verbose = 1;
