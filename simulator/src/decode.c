@@ -70,3 +70,57 @@ void store_operand(PDP11 *cpu, int mode, int reg, uint16_t val)
     uint16_t addr = resolve_addr(cpu, mode, reg);
     mem_write_word(cpu, addr, val);
 }
+
+uint16_t resolve_byte_addr(PDP11 *cpu, int mode, int reg){
+    uint16_t addr = 0;
+    uint16_t index;
+
+    int step = (reg == 6 || reg == 7) ? 2 : 1;
+
+    switch (mode) {
+        case 0:                // Регистровый
+            break;
+
+        case 1:                // (Rn)
+            addr = cpu -> reg[reg];
+            break;
+
+        case 2:                //(Rn)+
+            addr = cpu ->reg[reg];
+            cpu -> reg[reg] +=step;
+            break;
+
+        case 3:                // @(Rn)+
+            addr = cpu -> reg[reg];
+            cpu -> reg[reg] += 2;
+            addr = mem_read_word(cpu, addr);
+            break;
+        
+        case 4:                // -(Rn)
+            cpu->reg[reg] -= step;
+            addr = cpu -> reg[reg];
+            break;
+        
+        case 5:                // @-(Rn)
+            cpu->reg[reg] -= 2;
+            addr = cpu->reg[reg];
+            addr = mem_read_word(cpu, addr);
+            break;
+        
+        case 6:                 //X(Rn)
+            index = mem_read_word(cpu, cpu->reg[PC]);
+            cpu->reg[PC] += 2;
+            addr = cpu->reg[reg] + index;
+            break;
+
+        case 7:                 //@X(Rn)
+            index = mem_read_word(cpu, cpu->reg[PC]);
+            cpu->reg[PC] += 2;
+            addr = cpu->reg[reg] + index;
+            addr = mem_read_word(cpu, addr);
+            break;
+    }
+
+    return addr;
+
+}

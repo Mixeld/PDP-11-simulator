@@ -51,7 +51,6 @@ static void check_keyboard (void) {
     char c;
     int n = read(STDIN_FILENO, &c, 1);
     
-    /* ОТЛАДКА */
     static int counter = 0;
     counter++;
     if (counter % 100000 == 0) {
@@ -65,7 +64,6 @@ static void check_keyboard (void) {
     }
 }
 
-// чтение регистров терминала
 uint16_t terminal_read_tks(void){
 
     check_keyboard();

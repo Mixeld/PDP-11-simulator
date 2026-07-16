@@ -11,6 +11,7 @@
 
 uint16_t fetch_operand(PDP11 *cpu, int mode, int reg);
 uint16_t resolve_dst_addr(PDP11 *cpu, int mode, int reg);
+uint16_t resolve_byte_addr(PDP11 *cpu, int mode, int reg);
 void     store_operand(PDP11 *cpu, int mode, int reg, uint16_t val);
 
 #endif

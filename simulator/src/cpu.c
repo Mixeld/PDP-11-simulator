@@ -74,3 +74,15 @@ void cpu_run(PDP11 *cpu)
            (unsigned long long)cpu->cycles);
     debug_dump_regs(cpu);
 }
+
+void cpu_update_nz_byte (PDP11 *cpu, uint16_t result){
+    if (result == 0)
+        cpu_set_flag(cpu, PSW_Z);
+    else 
+        cpu_clear_flag(cpu, PSW_Z);
+
+    if (result & 0x80)
+        cpu_set_flag(cpu, PSW_N);
+    else
+        cpu_clear_flag(cpu, PSW_N);
+}

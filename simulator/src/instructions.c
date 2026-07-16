@@ -6,16 +6,414 @@
 
 /* ================ Вспомогательные ================ */
 
-static void do_branch(PDP11 *cpu, uint16_t instr)
-{
+static void do_branch(PDP11 *cpu, uint16_t instr) {
     int8_t offset = INSTR_BRANCH_OFFSET(instr);
     cpu->reg[PC] += (int16_t)(offset * 2);
 }
 
+static uint8_t fetch_byte_operand (PDP11 *cpu, int mode, int reg) {     
+    if (mode == 0)
+        return cpu->reg[reg] & 0xFF;
+
+    uint16_t addr = resolve_byte_addr (cpu, mode, reg);
+    return mem_read_byte(cpu, addr);
+}
+
+static void store_byte_to_register (PDP11 *cpu, int reg, uint8_t val){
+    if (val & 0x80) {
+        cpu->reg[reg] = 0xFF00 | val;
+    } else {
+        cpu->reg[reg] = val;
+    }
+}
+
+static uint8_t fetch_byte_dst (PDP11 *cpu, int mode, int reg, uint16_t *addr_out){
+    if (mode == 0){
+        *addr_out = 0;
+        return cpu -> reg[reg] & 0xFF;
+    }
+
+    *addr_out = resolve_byte_addr(cpu, mode, reg);
+    return mem_read_byte(cpu, *addr_out);
+}
+
+static void store_byte_dst (PDP11 *cpu, int mode, int reg, uint16_t addr, uint8_t val){
+    if (mode == 0){
+        store_byte_to_register (cpu, reg, val);
+    } else {
+        mem_write_byte(cpu, addr, val);
+    }
+}
+
+/* ================ БАЙТОВЫЕ КОМАНДЫ ================ */
+
+void instr_movb(PDP11 *cpu, uint16_t instr){
+    int sm = INSTR_SRC_MODE(instr);
+    int sr = INSTR_SRC_REG(instr);
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    uint8_t src = fetch_byte_operand(cpu, sm, sr);
+
+    if (dm == 0) {
+        store_byte_to_register(cpu, dr, src);
+    } else {
+        uint16_t addr = resolve_byte_addr (cpu, dm, dr);
+        mem_write_byte(cpu, addr, src);
+    }
+
+    cpu_update_nz_byte(cpu, src);
+    cpu_clear_flag(cpu, PSW_V);
+}
+
+void instr_cmpb(PDP11 *cpu, uint16_t instr){
+    int sm = INSTR_SRC_MODE(instr);
+    int sr = INSTR_SRC_REG(instr);
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    uint8_t src = fetch_byte_operand(cpu, sm, sr);
+    uint8_t dst = fetch_byte_operand(cpu, dm, dr);
+
+    uint8_t result = src - dst;
+
+    cpu_update_nz_byte(cpu, result);
+
+    if (src < dst)
+        cpu_set_flag(cpu, PSW_C);
+    else
+        cpu_clear_flag(cpu, PSW_C);
+
+    if (((src ^ dst) & 0x80) != 0 && ((src ^ result) & 0x80) != 0)
+        cpu_set_flag(cpu, PSW_V);
+    else 
+        cpu_clear_flag(cpu, PSW_V);
+}
+
+
+void instr_bitb(PDP11 *cpu, uint16_t instr){
+    int sm = INSTR_SRC_MODE(instr);
+    int sr = INSTR_SRC_REG(instr);
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    uint8_t src = fetch_byte_operand(cpu, sm, sr);
+    uint8_t dst = fetch_byte_operand(cpu, dm, dr);
+    
+    uint8_t result = src & dst;
+
+    cpu_update_nz_byte(cpu, result);
+    cpu_clear_flag(cpu, PSW_V);
+}
+
+void instr_bicb (PDP11 *cpu, uint16_t instr){
+    int sm = INSTR_SRC_MODE(instr);
+    int sr = INSTR_SRC_REG(instr);
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    uint8_t src = fetch_byte_operand(cpu, sm, sr);
+    uint8_t dst;
+    uint16_t dst_addr = 0;
+
+    if (dm == 0){
+        dst = cpu->reg[dr] & 0xFF;
+    } else {
+        dst_addr = resolve_byte_addr (cpu, dm, dr);
+        dst = mem_read_byte(cpu, dst_addr);
+    }
+
+    uint8_t result = dst & (~src);
+
+    if (dm == 0){
+        store_byte_to_register(cpu, dr, result);
+    } else {
+        mem_write_byte(cpu, dst_addr, result);
+    }
+
+    cpu_update_nz_byte(cpu, result);
+    cpu_clear_flag(cpu, PSW_V);
+}
+
+void instr_bisb(PDP11 *cpu, uint16_t instr)
+{
+    int sm = INSTR_SRC_MODE(instr);
+    int sr = INSTR_SRC_REG(instr);
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    uint8_t src = fetch_byte_operand(cpu, sm, sr);
+    uint8_t dst;
+    uint16_t dst_addr = 0;
+
+    if (dm == 0) {
+        dst = cpu->reg[dr] & 0xFF;
+    } else {
+        dst_addr = resolve_byte_addr(cpu, dm, dr);
+        dst = mem_read_byte(cpu, dst_addr);
+    }
+
+    uint8_t result = dst | src;
+
+    if (dm == 0) {
+        store_byte_to_register(cpu, dr, result);
+    } else {
+        mem_write_byte(cpu, dst_addr, result);
+    }
+
+    cpu_update_nz_byte(cpu, result);
+    cpu_clear_flag(cpu, PSW_V);
+}
+
+void instr_clrb(PDP11* cpu, uint16_t instr){
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+
+    if (dm == 0){
+        cpu -> reg[dr] &= 0xFF00;
+    } else {
+        uint16_t addr = resolve_byte_addr(cpu, dm, dr);
+        mem_write_byte(cpu, addr, 0);
+    }
+
+    cpu_set_flag(cpu, PSW_Z);
+    cpu_clear_flag(cpu, PSW_N);
+    cpu_clear_flag(cpu, PSW_V);
+    cpu_clear_flag(cpu, PSW_C);
+}
+
+void instr_comb(PDP11 *cpu, uint16_t instr) {
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    uint16_t addr = 0;
+    
+    uint8_t val = fetch_byte_dst(cpu, dm, dr, &addr);
+    uint8_t result = ~val;
+    store_byte_dst(cpu, dm, dr, addr, result);
+
+    cpu_update_nz_byte(cpu, result);
+    cpu_clear_flag(cpu, PSW_V);
+    cpu_set_flag(cpu, PSW_C);
+}
+
+
+void instr_incb(PDP11 *cpu, uint16_t instr){
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    uint16_t addr = 0;
+    
+    uint8_t val = fetch_byte_dst(cpu, dm, dr, &addr);
+    uint8_t result = val + 1;
+    store_byte_dst(cpu, dm, dr, addr, result);
+
+    cpu_update_nz_byte(cpu, result);
+
+    if (val == 0x7F)
+        cpu_set_flag(cpu, PSW_V);
+    else
+        cpu_clear_flag(cpu, PSW_V);
+}
+
+
+void instr_decb(PDP11 *cpu, uint16_t instr){
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    uint16_t addr = 0;
+    
+    uint8_t val = fetch_byte_dst(cpu, dm, dr, &addr);
+    uint8_t result = val - 1;
+    store_byte_dst(cpu, dm, dr, addr, result);
+
+    cpu_update_nz_byte(cpu, result);
+
+    if (val == 0x80)
+        cpu_set_flag(cpu, PSW_V);
+    else
+        cpu_clear_flag(cpu, PSW_V);
+}
+
+void instr_negb(PDP11 *cpu, uint16_t instr) {
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    uint16_t addr = 0;
+    
+    uint8_t val = fetch_byte_dst(cpu, dm, dr, &addr);
+    uint8_t result = (uint8_t)(-(int8_t)val);
+    store_byte_dst(cpu, dm, dr, addr, result);
+
+    cpu_update_nz_byte(cpu, result);
+
+    if (result == 0x80)
+        cpu_set_flag(cpu, PSW_V);
+    else
+        cpu_clear_flag(cpu, PSW_V);
+
+    if (result != 0)
+        cpu_set_flag(cpu, PSW_C);
+    else
+        cpu_clear_flag(cpu, PSW_C);
+}
+
+void instr_tstb(PDP11 *cpu, uint16_t instr) {
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    
+    uint8_t val = fetch_byte_operand(cpu, dm, dr);
+
+    cpu_update_nz_byte(cpu, val);
+    cpu_clear_flag(cpu, PSW_V);
+    cpu_clear_flag(cpu, PSW_C);
+}
+
+void instr_adcb(PDP11 *cpu, uint16_t instr) {
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    uint16_t addr = 0;
+    
+    uint8_t val = fetch_byte_dst(cpu, dm, dr, &addr);
+    uint8_t c = cpu_get_flag(cpu, PSW_C) ? 1 : 0;
+    uint8_t result = val + c;
+    store_byte_dst(cpu, dm, dr, addr, result);
+
+    cpu_update_nz_byte(cpu, result);
+
+    if (val == 0x7F && c == 1)
+        cpu_set_flag(cpu, PSW_V);
+    else
+        cpu_clear_flag(cpu, PSW_V);
+
+    if (val == 0xFF && c == 1)
+        cpu_set_flag(cpu, PSW_C);
+    else
+        cpu_clear_flag(cpu, PSW_C);
+}
+
+void instr_sbcb(PDP11 *cpu, uint16_t instr) {
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    uint16_t addr = 0;
+    
+    uint8_t val = fetch_byte_dst(cpu, dm, dr, &addr);
+    uint8_t c = cpu_get_flag(cpu, PSW_C) ? 1 : 0;
+    uint8_t result = val - c;
+    store_byte_dst(cpu, dm, dr, addr, result);
+
+    cpu_update_nz_byte(cpu, result);
+
+    if (val == 0x80 && c == 1)
+        cpu_set_flag(cpu, PSW_V);
+    else
+        cpu_clear_flag(cpu, PSW_V);
+
+    if (val == 0x00 && c == 1)
+        cpu_set_flag(cpu, PSW_C);
+    else
+        cpu_clear_flag(cpu, PSW_C);
+}
+
+void instr_aslb(PDP11 *cpu, uint16_t instr) {
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    uint16_t addr = 0;
+    
+    uint8_t val = fetch_byte_dst(cpu, dm, dr, &addr);
+    uint8_t result = val << 1;
+    store_byte_dst(cpu, dm, dr, addr, result);
+
+    /* C = бывший бит 7 */
+    if (val & 0x80)
+        cpu_set_flag(cpu, PSW_C);
+    else
+        cpu_clear_flag(cpu, PSW_C);
+
+    cpu_update_nz_byte(cpu, result);
+
+    /* V = N xor C */
+    int n = cpu_get_flag(cpu, PSW_N);
+    int c = cpu_get_flag(cpu, PSW_C);
+    if (n ^ c)
+        cpu_set_flag(cpu, PSW_V);
+    else
+        cpu_clear_flag(cpu, PSW_V);
+}
+
+void instr_asrb(PDP11 *cpu, uint16_t instr) {
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    uint16_t addr = 0;
+    
+    uint8_t val = fetch_byte_dst(cpu, dm, dr, &addr);
+    uint8_t result = (val >> 1) | (val & 0x80);   
+    store_byte_dst(cpu, dm, dr, addr, result);
+
+    if (val & 1)
+        cpu_set_flag(cpu, PSW_C);
+    else
+        cpu_clear_flag(cpu, PSW_C);
+
+    cpu_update_nz_byte(cpu, result);
+
+    int n = cpu_get_flag(cpu, PSW_N);
+    int c = cpu_get_flag(cpu, PSW_C);
+    if (n ^ c)
+        cpu_set_flag(cpu, PSW_V);
+    else
+        cpu_clear_flag(cpu, PSW_V);
+}
+
+void instr_rolb(PDP11 *cpu, uint16_t instr) {
+   
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    uint16_t addr = 0;
+    
+    uint8_t val = fetch_byte_dst(cpu, dm, dr, &addr);
+    uint8_t old_c = cpu_get_flag(cpu, PSW_C) ? 1 : 0;
+    uint8_t result = (val << 1) | old_c;
+    store_byte_dst(cpu, dm, dr, addr, result);
+
+    if (val & 0x80)
+        cpu_set_flag(cpu, PSW_C);
+    else
+        cpu_clear_flag(cpu, PSW_C);
+
+    cpu_update_nz_byte(cpu, result);
+
+    int n = cpu_get_flag(cpu, PSW_N);
+    int c = cpu_get_flag(cpu, PSW_C);
+    if (n ^ c)
+        cpu_set_flag(cpu, PSW_V);
+    else
+        cpu_clear_flag(cpu, PSW_V);
+}
+
+void instr_rorb(PDP11 *cpu, uint16_t instr) {
+    int dm = INSTR_DST_MODE(instr);
+    int dr = INSTR_DST_REG(instr);
+    uint16_t addr = 0;
+    
+    uint8_t val = fetch_byte_dst(cpu, dm, dr, &addr);
+    uint8_t old_c = cpu_get_flag(cpu, PSW_C) ? 1 : 0;
+    uint8_t result = (val >> 1) | (old_c << 7);
+    store_byte_dst(cpu, dm, dr, addr, result);
+
+    if (val & 1)
+        cpu_set_flag(cpu, PSW_C);
+    else
+        cpu_clear_flag(cpu, PSW_C);
+
+    cpu_update_nz_byte(cpu, result);
+
+    int n = cpu_get_flag(cpu, PSW_N);
+    int c = cpu_get_flag(cpu, PSW_C);
+    if (n ^ c)
+        cpu_set_flag(cpu, PSW_V);
+    else
+        cpu_clear_flag(cpu, PSW_V);
+}
 /* ================ Двухоперандные ================ */
 
-static void instr_mov(PDP11 *cpu, uint16_t instr)
-{
+static void instr_mov(PDP11 *cpu, uint16_t instr) {
     int sm = INSTR_SRC_MODE(instr);
     int sr = INSTR_SRC_REG(instr);
     int dm = INSTR_DST_MODE(instr);
@@ -34,8 +432,7 @@ static void instr_mov(PDP11 *cpu, uint16_t instr)
     cpu_clear_flag(cpu, PSW_V);
 }
 
-static void instr_add(PDP11 *cpu, uint16_t instr)
-{
+static void instr_add(PDP11 *cpu, uint16_t instr) {
     int sm = INSTR_SRC_MODE(instr);
     int sr = INSTR_SRC_REG(instr);
     int dm = INSTR_DST_MODE(instr);
@@ -883,39 +1280,43 @@ void execute(PDP11 *cpu, uint16_t instr)
 {
     uint16_t opcode;
 
-    /* HALT */ 
     if (instr == 0000000) {
         instr_halt(cpu, instr);
         return;
     }
 
-    if (instr == 0000002){
-        instr_rti (cpu, instr);
+    if (instr == 0000002) {
+        instr_rti(cpu, instr);
+        return;
     }
- 
+
     if (instr >= 0000240 && instr <= 0000277) {
         instr_flags(cpu, instr);
         return;
     }
 
-    if (((instr >> 9) & 0177) == 0077){
+    if (((instr >> 9) & 0177) == 0077) {
         instr_sob(cpu, instr);
         return;
     }
 
-    /* Двухоперандные: биты 15-12 */
     opcode = (instr >> 12) & 0xF;
     switch (opcode) {
-    case 001: instr_mov(cpu, instr); return;
-    case 002: instr_cmp(cpu, instr); return;
-    case 003: instr_bit(cpu, instr); return;
-    case 004: instr_bic(cpu, instr); return;
-    case 005: instr_bis(cpu, instr); return;
-    case 006: instr_add(cpu, instr); return;
-    case 016: instr_sub(cpu, instr); return;
+    case 001: instr_mov(cpu, instr);  return;
+    case 002: instr_cmp(cpu, instr);  return;
+    case 003: instr_bit(cpu, instr);  return;
+    case 004: instr_bic(cpu, instr);  return;
+    case 005: instr_bis(cpu, instr);  return;
+    case 006: instr_add(cpu, instr);  return;
+    case 016: instr_sub(cpu, instr);  return;
+
+    case 011: instr_movb(cpu, instr); return;
+    case 012: instr_cmpb(cpu, instr); return;
+    case 013: instr_bitb(cpu, instr); return;
+    case 014: instr_bicb(cpu, instr); return;
+    case 015: instr_bisb(cpu, instr); return;
     }
 
-    /* Однооперандные: биты 15-6 */
     opcode = (instr >> 6) & 0x3FF;
     switch (opcode) {
     case 00001: instr_jmp(cpu, instr);  return;
@@ -926,27 +1327,37 @@ void execute(PDP11 *cpu, uint16_t instr)
     case 00053: instr_dec(cpu, instr);  return;
     case 00054: instr_neg(cpu, instr);  return;
     case 00055: instr_adc(cpu, instr);  return;
-    case 00056: instr_sbc(cpu, instr); return;
+    case 00056: instr_sbc(cpu, instr);  return;
     case 00057: instr_tst(cpu, instr);  return;
     case 00060: instr_ror(cpu, instr);  return;
     case 00061: instr_rol(cpu, instr);  return;
     case 00062: instr_asr(cpu, instr);  return;
     case 00063: instr_asl(cpu, instr);  return;
+
+    case 01050: instr_clrb(cpu, instr); return;
+    case 01051: instr_comb(cpu, instr); return;
+    case 01052: instr_incb(cpu, instr); return;
+    case 01053: instr_decb(cpu, instr); return;
+    case 01054: instr_negb(cpu, instr); return;
+    case 01055: instr_adcb(cpu, instr); return;
+    case 01056: instr_sbcb(cpu, instr); return;
+    case 01057: instr_tstb(cpu, instr); return;
+    case 01060: instr_rorb(cpu, instr); return;
+    case 01061: instr_rolb(cpu, instr); return;
+    case 01062: instr_asrb(cpu, instr); return;
+    case 01063: instr_aslb(cpu, instr); return;
     }
 
-    /* JSR */
     if ((instr & 0xFE00) == 0x0800) {
         instr_jsr(cpu, instr);
         return;
     }
 
-    /* RTS */
     if ((instr & 0xFFF8) == 000200) {
         instr_rts(cpu, instr);
         return;
     }
 
-    /* Переходы: биты 15-8 */
     opcode = instr >> 8;
     switch (opcode) {
     case 0001: instr_br(cpu, instr);   return;
@@ -964,10 +1375,9 @@ void execute(PDP11 *cpu, uint16_t instr)
     case 0205: instr_bvs(cpu, instr);  return;
     case 0206: instr_bcc(cpu, instr);  return;
     case 0207: instr_bcs(cpu, instr);  return;
-    case 0210: instr_emt(cpu, instr); return;
+    case 0210: instr_emt(cpu, instr);  return;
     case 0211: instr_trap(cpu, instr); return;
-}
-
+    }
 
     printf("Неизвестная инструкция: %06o (PC=%06o)\n",
            instr, (uint16_t)(cpu->reg[PC] - 2));

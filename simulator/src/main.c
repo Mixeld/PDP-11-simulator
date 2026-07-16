@@ -20,8 +20,8 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--trace") == 0) {
             trace_mode = 1;
-        } else if (strcmp(argv[i], "-i") == 0) {        /* НОВОЕ */
-            interactive_mode = 1;                        /* НОВОЕ */
+        } else if (strcmp(argv[i], "-i") == 0) {        
+            interactive_mode = 1;                        
         } else if (argv[i][0] != '-') {
             tape_file = argv[i];
         }

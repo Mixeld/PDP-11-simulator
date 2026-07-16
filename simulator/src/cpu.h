@@ -12,5 +12,6 @@ void cpu_set_flag(PDP11 *cpu, uint16_t flag);
 void cpu_clear_flag(PDP11 *cpu, uint16_t flag);
 int  cpu_get_flag(PDP11 *cpu, uint16_t flag);
 void cpu_update_nz(PDP11 *cpu, uint16_t result);
+void cpu_update_nz_byte(PDP11 *cpu, uint16_t result);
 
 #endif
