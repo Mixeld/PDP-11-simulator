@@ -11,9 +11,6 @@ static int terminal_initialized = 0;
 static int last_char = -1;
 static int char_available = 0;
 
-
-// Инициализация терминала
-
 void terminal_init (void){
     if (terminal_initialized)
         return;

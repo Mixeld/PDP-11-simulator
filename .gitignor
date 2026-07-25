@@ -4,6 +4,8 @@ build/
 obj/
 *.o
 *.obj
+*.lda
+*.lst
 
 # Executables
 simulator/pdp11
